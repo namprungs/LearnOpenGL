@@ -20,22 +20,18 @@ void processInput(GLFWwindow* window);
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
+static float fractf(float x) { return x - floorf(x); }
+static float hash11(float x) { return fractf(sinf(x * 127.1f) * 43758.5453f); }
+
 int main()
 {
-    // GLFW
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(
-        SCR_WIDTH, SCR_HEIGHT, "HW1 - 2D Generative Spiral", NULL, NULL);
-    if (!window)
-    {
-        std::cout << "Failed to create window\n";
-        glfwTerminate();
-        return -1;
-    }
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "HW1 - Galaxy Swirl", NULL, NULL);
+    if (!window) { std::cout << "Failed to create window\n"; glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -88,7 +84,8 @@ int main()
     stbi_set_flip_vertically_on_load(true);
     unsigned char* data = stbi_load(
         FileSystem::getPath("resources/textures/hw1-3.jpg").c_str(),
-        &w, &h, &c, 0);
+        &w, &h, &c, 0
+    );
 
     if (data)
     {
@@ -99,7 +96,7 @@ int main()
 
     shader.use();
     shader.setInt("texture1", 0);
-    shader.setInt("texture2", 0); // ใช้รูปเดียว
+    shader.setInt("texture2", 0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -115,24 +112,37 @@ int main()
         glBindVertexArray(VAO);
 
         float t = (float)glfwGetTime();
-        int N = 120;
+        int N = 220;
 
         unsigned int loc = glGetUniformLocation(shader.ID, "transform");
 
+        // 4 arms galaxy swirl
+        const int ARMS = 4;
+
         for (int i = 0; i < N; i++)
         {
-            float fi = (float)i / N;
-            float angle = fi * 6.28318f * 3.0f + t * 0.8f;   // spiral
-            float radius = 0.15f + 0.35f * fi;
-            radius += 0.05f * sin(t * 2.0f + fi * 20.0f);    // breathing
+            float fi = (float)i / (float)(N - 1);
+            float armPick = floorf(hash11(i * 12.3f) * (float)ARMS); // 0..ARMS-1
+            float armOffset = (armPick / (float)ARMS) * 6.28318f;
 
-            float x = radius * cos(angle);
-            float y = radius * sin(angle);
+            // radius: more density near center
+            float r = 0.03f + 0.85f * (fi * fi);
+            r *= 0.85f + 0.08f * sinf(t * 1.7f + fi * 25.0f);
 
-            float scale = 0.10f + 0.05f * sin(t * 3.0f + fi * 15.0f);
-            float rot = angle + sin(t + fi * 10.0f);
+            // swirl: angle increases with radius -> spiral arms
+            float angle = armOffset + r * 10.0f + t * 0.5f;
 
-            glm::mat4 m = glm::mat4(1.0f);
+            // jitter / thickness
+            float jitter = (hash11(i * 91.7f + t * 10.0f) - 0.5f) * 0.08f * (1.0f - fi);
+            float x = (r + jitter) * cosf(angle);
+            float y = (r + jitter) * sinf(angle);
+
+            float scale = 0.03f + 0.05f * (1.0f - fi);
+            scale *= 0.8f + 0.6f * hash11(i * 7.7f); // random star sizes
+
+            float rot = angle + t * 0.8f;
+
+            glm::mat4 m(1.0f);
             m = glm::translate(m, glm::vec3(x, y, 0.0f));
             m = glm::rotate(m, rot, glm::vec3(0, 0, 1));
             m = glm::scale(m, glm::vec3(scale));

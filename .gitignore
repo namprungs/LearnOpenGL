@@ -2,3 +2,8 @@
 bin/
 build/
 out/
+.vs/
+**/.vs/
+*.vcxproj.user
+out/
+build/
